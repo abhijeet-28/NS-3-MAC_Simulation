@@ -77,18 +77,20 @@ int getindex(int i)
 
 int main (int argc, char *argv[])
 {
-  uint32_t nWifis = 2;
-  uint32_t nStas[2]={8,4};
+  for(double percent=0.1;percent<=0.9;percent+=0.1){
+  uint32_t nWifis = 1;
+  uint32_t nStas[1]={8};
   //uint32_t nStas = 2;
   bool sendIp = true;
   bool writeMobility = false;
-  int totalrate=3.3;
+  
+  double totalrate=11.0*percent;
 
   uint32_t payloadSize = 1472;                       /* Transport layer payload size in bytes. */
   std::string dataRate = "1Mbps";                  /* Application layer datarate. */
   std::string tcpVariant = "ns3::TcpNewReno";        /* TCP variant type. */
   std::string phyRate = "HtMcs7";                    /* Physical layer bitrate. */
-  double simulationTime = 2;                        /* Simulation time in seconds. */
+  double simulationTime = 5;                        /* Simulation time in seconds. */
   // bool pcapTracing = true;                          /* PCAP Tracing is enabled or not. */
 
   /* No fragmentation and no RTS/CTS */
@@ -222,25 +224,33 @@ int main (int argc, char *argv[])
   /* Install TCP Receiver on the access point */
   PacketSinkHelper sinkHelper ("ns3::TcpSocketFactory", InetSocketAddress (Ipv4Address::GetAny (), 9));
   ApplicationContainer sinkApp = sinkHelper.Install (staNodes[0]);  
-  sinkApp.Add(sinkHelper.Install (staNodes[1]));
+  
   // sink = StaticCast<PacketSink> (sinkApp.Get(0));
 
   /* Install TCP/UDP Transmitter on the station */  
   ApplicationContainer serverApp;//1,serverApp2;
   srand(time(NULL));
 
-  int x=rand()%totalrate;
-  int y=rand()%(totalrate-x);
   
-  
+  double arr[56];
+  double sum=0.0;
+  for(int i=0;i<56;i++)
+  {
+    arr[i]=rand()%20+10;
+    sum+=arr[i];
+  }
+  // int count=0;
+  double anss=0.0;
   for(int sender=0;sender<8;sender++)
   {
 
-     double valself=(x*1.0)/56.0;
+     
     for(int rcv=0;rcv<8;rcv++)
     {
         
         if(sender==rcv) continue;
+        double valself=(totalrate*1.0)/56.0;
+        anss+=valself;
         OnOffHelper server ("ns3::TcpSocketFactory", (InetSocketAddress (staInterfaces[0].GetAddress (rcv), 9)));
         server.SetAttribute ("PacketSize", UintegerValue (payloadSize));
         server.SetAttribute ("OnTime", StringValue ("ns3::ConstantRandomVariable[Constant=1]"));
@@ -248,76 +258,21 @@ int main (int argc, char *argv[])
         server.SetAttribute ("DataRate", DataRateValue (DataRate (std::to_string(valself)+"Mbps")));
         serverApp.Add(server.Install(staNodes[0].Get(sender)));    
     }
-    double valcross=(y*1.0)/32.0;
-    for(int rcv=0;rcv<4;rcv++)
-    {
-        
-        OnOffHelper server ("ns3::TcpSocketFactory", (InetSocketAddress (staInterfaces[1].GetAddress (rcv), 9)));
-        server.SetAttribute ("PacketSize", UintegerValue (payloadSize));
-        server.SetAttribute ("OnTime", StringValue ("ns3::ConstantRandomVariable[Constant=1]"));
-        server.SetAttribute ("OffTime", StringValue ("ns3::ConstantRandomVariable[Constant=0]"));
-        server.SetAttribute ("DataRate", DataRateValue (DataRate (std::to_string(valcross)+"Mbps")));
-        serverApp.Add(server.Install(staNodes[0].Get(sender)));    
-    }
+    
     
   }
+std::cout<<"fasfas "<<anss<<std::endl;
 
 
-
-  for(int sender=0;sender<4;sender++)
-  {     
-    double valself=(x*1.0)/(12.0);
-    for(int rcv=0;rcv<4;rcv++)
-    {
-        if(sender==rcv) continue;
-        OnOffHelper server ("ns3::TcpSocketFactory", (InetSocketAddress (staInterfaces[1].GetAddress (rcv), 9)));
-        server.SetAttribute ("PacketSize", UintegerValue (payloadSize));
-        server.SetAttribute ("OnTime", StringValue ("ns3::ConstantRandomVariable[Constant=1]"));
-        server.SetAttribute ("OffTime", StringValue ("ns3::ConstantRandomVariable[Constant=0]"));
-        server.SetAttribute ("DataRate", DataRateValue (DataRate (std::to_string(valself)+"Mbps")));
-        serverApp.Add(server.Install(staNodes[1].Get(sender)));
-    }
-    double valcross=((11-x-y)*1.0)/(32.0);
-    for(int rcv=0;rcv<8;rcv++)
-    {
-          
-        OnOffHelper server ("ns3::TcpSocketFactory", (InetSocketAddress (staInterfaces[0].GetAddress (rcv), 9)));
-        server.SetAttribute ("PacketSize", UintegerValue (payloadSize));
-        server.SetAttribute ("OnTime", StringValue ("ns3::ConstantRandomVariable[Constant=1]"));
-        server.SetAttribute ("OffTime", StringValue ("ns3::ConstantRandomVariable[Constant=0]"));
-        server.SetAttribute ("DataRate", DataRateValue (DataRate (std::to_string(valcross)+"Mbps")));
-        serverApp.Add(server.Install(staNodes[1].Get(sender)));
-    }
+  
     
-  }
+  
 
 
   sinkApp.Start (Seconds (0.0));
   serverApp.Start (Seconds (1.0));
 
 
-  // Address dest;
-  // std::string protocol;
-  // if (sendIp)
-  //   {
-  //     dest = InetSocketAddress (staInterfaces[1].GetAddress (1), 1025);
-  //     protocol = "ns3::TcpSocketFactory";
-  //   }
-  // else
-  //   {
-  //     PacketSocketAddress tmp;
-  //     tmp.SetSingleDevice (staDevices[0].Get (0)->GetIfIndex ());
-  //     tmp.SetPhysicalAddress (staDevices[1].Get (0)->GetAddress ());
-  //     tmp.SetProtocol (0x807);
-  //     dest = tmp;
-  //     protocol = "ns3::PacketSocketFactory";
-  //   }
-
-  // OnOffHelper onoff = OnOffHelper (protocol, dest);
-  // onoff.SetConstantRate (DataRate ("500kb/s"));
-  // ApplicationContainer apps = onoff.Install (staNodes[0].Get (0));
-  // apps.Start (Seconds (0.5));
-  // apps.Stop (Seconds (3.0));
 
 
   FlowMonitorHelper flowHelper;
@@ -327,29 +282,20 @@ int main (int argc, char *argv[])
 
   Ptr<FlowMonitor> flowMonitor = flowHelper.InstallAll();
   
-  // Ptr<Ipv4FlowClassifier> classifier = DynamicCast<Ipv4FlowClassifier>(flowHelper.GetClassifier()); 
-  // Ptr<FlowMonitor> monitor1 = flowHelper.GetMonitor();
-  // flowMonitor->SetFlowClassifier(classifier);
-  // Ptr<FlowMonitor> fm=flowHelper.InstallAll(ap.get(0));
   
 
   wifiPhy.EnablePcap ("wifi-wired-bridging", apDevices[0]);
-  wifiPhy.EnablePcap ("wifi-wired-bridging", apDevices[1]);
+  
 
-  // if (writeMobility)
-  //   {
-  //     AsciiTraceHelper ascii;
-  //     MobilityHelper::EnableAsciiAll (ascii.CreateFileStream ("wifi-wired-bridging.mob"));
-  //   }
-
+  
   Simulator::Stop (Seconds (simulationTime + 1));
   Simulator::Run ();
 
 
-  double matrix[12][12];
-  for(int i=0;i<12;i++)
+  double matrix[8][8];
+  for(int i=0;i<8;i++)
   {
-    for(int j=0;j<12;j++)
+    for(int j=0;j<8;j++)
     {
       matrix[i][j]=0.0;
     }
@@ -375,18 +321,18 @@ int main (int argc, char *argv[])
 
       
 
-      NS_LOG_UNCOND("Flow ID: " << iter->first << " Src Addr " << t.sourceAddress << " Dst Addr " << t.destinationAddress);
-      NS_LOG_UNCOND("Tx Packets = " << iter->second.txPackets);
-      NS_LOG_UNCOND("Rx Packets = " << iter->second.rxPackets);
-      NS_LOG_UNCOND("Jitter Sum = " << iter->second.jitterSum);
+      // NS_LOG_UNCOND("Flow ID: " << iter->first << " Src Addr " << t.sourceAddress << " Dst Addr " << t.destinationAddress);
+      // NS_LOG_UNCOND("Tx Packets = " << iter->second.txPackets);
+      // NS_LOG_UNCOND("Rx Packets = " << iter->second.rxPackets);
+      // NS_LOG_UNCOND("Jitter Sum = " << iter->second.jitterSum);
 
       
       
-      NS_LOG_UNCOND("DelaySum = " << iter->second.delaySum);
+      // NS_LOG_UNCOND("DelaySum = " << iter->second.delaySum);
 
       double tput=iter->second.rxBytes * 8.0 / (iter->second.timeLastRxPacket.GetSeconds()-iter->second.timeFirstTxPacket.GetSeconds()) / 1024 ;
       matrix[index1][index2]+=tput;
-      NS_LOG_UNCOND("Throughput: " << tput << " Kbps");
+      // NS_LOG_UNCOND("Throughput: " << tput << " Kbps");
      
       // th_put[index]=tput;
 
@@ -403,17 +349,13 @@ int main (int argc, char *argv[])
 
 NS_LOG_UNCOND("\n\nReport\n\n");
 
- NS_LOG_UNCOND("x: " << x << " Kbps");
-      NS_LOG_UNCOND("y: " << y << " Kbps");
 
-       NS_LOG_UNCOND("size: " << serverApp.GetN() << " Kbps");
       
 double totalsum=0.0;
-double net1=0.0;
-double net2=0.0;
-for(int i=0;i<12;i++)
+
+for(int i=0;i<8;i++)
 {
-  for(int j=0;j<12;j++)
+  for(int j=0;j<8;j++)
   {
     totalsum+=matrix[i][j];
     std::cout<<matrix[i][j]<<" ";
@@ -421,42 +363,27 @@ for(int i=0;i<12;i++)
   std::cout<<std::endl;
 }
 
-double temp1=0.0;
-double temp2=0.0;
-for(int i=0;i<8;i++)
-{
-  for(int j=0;j<8;j++)
-  {
-    temp1+=matrix[i][j];
-    
-  }
+
+
+double ans=(totalsum*1.0)/1024.0;
+std::cout<<"network1 : "<<percent*100<<" "<<ans<< std::endl;
+
+
+
+
+
+// flowMonitor->SerializeToXmlFile("report1.xml", true, true);
   
-}
+double throughput = 0;
+          uint32_t totalPacketsThrough = 0;
+          for(int ii = 0; ii<8; ii++){
+            totalPacketsThrough  =  totalPacketsThrough +  DynamicCast<PacketSink> (sinkApp.Get (ii))->GetTotalRx ();
+          }
 
-for(int i=8;i<12;i++)
-{
-  for(int j=8;j<12;j++)
-  {
-    temp2+=matrix[i][j];
-    
-  }
-  
-}
-net1=totalsum-temp2;
-net2=totalsum-temp1;
-std::cout<<"network1 : "<<net1<< std::endl;
-std::cout<<"network2 : "<<net2<< std::endl;
-
-std::cout<<std::endl;std::cout<<std::endl;std::cout<<std::endl;std::cout<<std::endl;
-
-
-
-
-flowMonitor->SerializeToXmlFile("report1.xml", true, true);
-  
-
+          throughput = totalPacketsThrough * 8 / (simulationTime * 1000000.0); //Mbit/s
+          std::cout << throughput << " Mbit/s" <<std::endl;
   Simulator::Destroy ();
-
+}
   
 
 
