@@ -72,8 +72,8 @@ main(int argc, char *argv[])
 
 
   double percentage=0.10;
-  while(percentage<=0.90)
-  {
+  
+  
 
     out<<percentage*100<<",";
 
@@ -81,8 +81,16 @@ main(int argc, char *argv[])
   std::string dataRate = "1Mbps";                  /* Application layer datarate. */
   std::string tcpVariant = "ns3::TcpNewReno";        /* TCP variant type. */
   std::string phyRate = "HtMcs7";                    /* Physical layer bitrate. */
-  double simulationTime = 1;                        /* Simulation time in seconds. */
+  double simulationTime = 10;                        /* Simulation time in seconds. */
   bool pcapTracing = true;                          /* PCAP Tracing is enabled or not. */
+
+
+
+
+
+
+
+
 
 
   /* Command line argument parser setup. */
@@ -97,7 +105,7 @@ main(int argc, char *argv[])
 
   /* No fragmentation and no RTS/CTS */
   Config::SetDefault ("ns3::WifiRemoteStationManager::FragmentationThreshold", StringValue ("999999"));
-  Config::SetDefault ("ns3::WifiRemoteStationManager::RtsCtsThreshold", StringValue ("999999"));
+  // Config::SetDefault ("ns3::WifiRemoteStationManager::RtsCtsThreshold", StringValue ("1000"));
   // ns3::FlowMonitorHelper
 
   /* Configure TCP Options */
@@ -107,10 +115,14 @@ main(int argc, char *argv[])
 
 
   std::string phyMode ("DsssRate11Mbps");
-  NodeContainer ap;
-  ap.Create(1);
-  NodeContainer sta;
-  sta.Create(8);
+  NodeContainer ap1;
+  ap1.Create(1);
+  NodeContainer ap2;
+  ap2.Create(1);
+  NodeContainer sta1;
+  sta1.Create(8);
+  NodeContainer sta2;
+  sta2.Create(4);
  
   WifiHelper wifi;
   wifi.SetStandard(WIFI_PHY_STANDARD_80211b);
@@ -127,21 +139,33 @@ main(int argc, char *argv[])
   wifiPhy.SetChannel(wifiChannel.Create());
 
   //Add a non-Qos upper mac, and disable the rate control
-  NqosWifiMacHelper wifiMac = NqosWifiMacHelper::Default();
+  NqosWifiMacHelper wifiMac1 = NqosWifiMacHelper::Default();
+  NqosWifiMacHelper wifiMac2 = NqosWifiMacHelper::Default();
+
   wifi.SetRemoteStationManager ("ns3::ConstantRateWifiManager", "DataMode", StringValue(phyMode), "ControlMode", StringValue(phyMode));
 
   //setup the rest of the upper mac
-  Ssid ssid = Ssid("wifi-default");
+  Ssid ssid1 = Ssid("network1");
+  Ssid ssid2 = Ssid("network2");
   // setup AP
-  wifiMac.SetType("ns3::ApWifiMac", "Ssid", SsidValue(ssid));
+  wifiMac1.SetType("ns3::ApWifiMac", "Ssid", SsidValue(ssid1));
+  wifiMac2.SetType("ns3::ApWifiMac", "Ssid", SsidValue(ssid2));
+
+
   
-  NetDeviceContainer apDevice = wifi.Install(wifiPhy, wifiMac, ap);
-  NetDeviceContainer devices = apDevice;
+  NetDeviceContainer apDevice1 = wifi.Install(wifiPhy, wifiMac1, ap1);
+  NetDeviceContainer apDevice2 = wifi.Install(wifiPhy, wifiMac2, ap2);
+  NetDeviceContainer devices1 = apDevice1;
+  NetDeviceContainer devices2 = apDevice2;
+
 
   //setup station
-  wifiMac.SetType("ns3::StaWifiMac", "Ssid", SsidValue(ssid), "ActiveProbing", BooleanValue(false));
-  NetDeviceContainer staDevice = wifi.Install(wifiPhy, wifiMac, sta);
-  devices.Add(staDevice);
+  wifiMac1.SetType("ns3::StaWifiMac", "Ssid", SsidValue(ssid1), "ActiveProbing", BooleanValue(false));
+  wifiMac1.SetType("ns3::StaWifiMac", "Ssid", SsidValue(ssid2), "ActiveProbing", BooleanValue(false));
+  NetDeviceContainer staDevice1 = wifi.Install(wifiPhy, wifiMac1, sta1);
+  NetDeviceContainer staDevice2 = wifi.Install(wifiPhy, wifiMac2, sta2);
+  devices1.Add(staDevice1);
+  devices2.Add(staDevice2);
 
   //Configure mobility
   MobilityHelper mobility;
@@ -153,33 +177,57 @@ main(int argc, char *argv[])
 
   mobility.SetPositionAllocator (positionAlloc);
   mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
-  mobility.Install (ap);
-  mobility.Install (sta);
+  mobility.Install (ap1);
+  mobility.Install (sta1);
+
+  mobility.Install (ap2);
+  mobility.Install (sta2);
   
   /* Internet stack */
   InternetStackHelper stack;
-  stack.Install (ap);
-  stack.Install (sta);
+  stack.Install (ap1);
+  stack.Install (sta1);
 
-  Ipv4AddressHelper address;
-  address.SetBase ("10.0.0.0", "255.255.255.0");
-  Ipv4InterfaceContainer apInterface;
-  apInterface = address.Assign (devices);
+  stack.Install (ap2);
+  stack.Install (sta2);
+
+  Ipv4AddressHelper address1;
+  address1.SetBase ("10.0.0.0", "255.255.255.0");
+  Ipv4InterfaceContainer apInterface1;
+  apInterface1 = address1.Assign (devices1);
+  
+  Ipv4AddressHelper address2;
+  address2.SetBase ("10.1.0.0", "255.255.255.0");
+  Ipv4InterfaceContainer apInterface2;
+  apInterface2 = address2.Assign (devices2);
   
   /* Populate routing table */
   Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
 
   /* Install TCP Receiver on the access point */
   PacketSinkHelper sinkHelper ("ns3::TcpSocketFactory", InetSocketAddress (Ipv4Address::GetAny (), 9));
-  ApplicationContainer sinkApp = sinkHelper.Install (ap);
-  sink = StaticCast<PacketSink> (sinkApp.Get (0));
+  ApplicationContainer sinkApp = sinkHelper.Install (sta1);
+  sinkApp.add(sinkHelper.Install (sta2));
+  sink = StaticCast<PacketSink> (sinkApp);
 
   /* Install TCP/UDP Transmitter on the station */
-  OnOffHelper server ("ns3::TcpSocketFactory", (InetSocketAddress (apInterface.GetAddress (0), 9)));
-  server.SetAttribute ("PacketSize", UintegerValue (payloadSize));
-  server.SetAttribute ("OnTime", StringValue ("ns3::ConstantRandomVariable[Constant=1]"));
-  server.SetAttribute ("OffTime", StringValue ("ns3::ConstantRandomVariable[Constant=0]"));
-  ApplicationContainer serverApp;
+  
+  for(int sender=0;sender<8;sender++)
+  {
+
+     OnOffHelper server1 ("ns3::TcpSocketFactory", (InetSocketAddress (apInterface1.GetAddress (0), 9)));
+      server.SetAttribute ("PacketSize", UintegerValue (payloadSize));
+      server.SetAttribute ("OnTime", StringValue ("ns3::ConstantRandomVariable[Constant=1]"));
+      server.SetAttribute ("OffTime", StringValue ("ns3::ConstantRandomVariable[Constant=0]"));
+      ApplicationContainer serverApp1;
+      serverApp1.Add(server1.Install(sta1))
+    for(int rcv=0;rcv<8;rcv++)
+    {
+
+    }
+  }
+
+  
   double totalDataRate=11.0*percentage;
   srand (time(NULL));
   double arr[8];
@@ -197,7 +245,7 @@ main(int argc, char *argv[])
     // NS_LOG_UNCOND("Yo");
 
     // ApplicationContainer appcont=;
-    serverApp.Add(server.Install (sta.Get(i)));
+    serverApp.Add(server.Install (sta1.Get(i)));
   }
   
 
@@ -227,14 +275,14 @@ main(int argc, char *argv[])
   // Ptr<FlowMonitor> fm=flowHelper.InstallAll(ap.get(0));
   
 
-  /* Enable Traces 
+   // Enable Traces 
   if (pcapTracing)
     {
       wifiPhy.SetPcapDataLinkType (YansWifiPhyHelper::DLT_IEEE802_11_RADIO);
       wifiPhy.EnablePcap ("AccessPoint", apDevice);
       wifiPhy.EnablePcap ("Station", staDevice);
     }
-  */
+  
   /* Start Simulation */
 
   Simulator::Stop (Seconds (simulationTime + 1));
@@ -386,17 +434,5 @@ double to_div=1000000.0;
   out<<"\n";
 
 
-
-
-
-
-
-
-
-
-
-
-  percentage+=0.05;
-}
   return 0;
 }
